@@ -25,6 +25,7 @@
 #include <exception>
 #include <vector> // ligand paths
 #include <cmath> // for ceila
+#include <iomanip> // for setprecision, fixed
 #include <boost/program_options.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/exception.hpp>
