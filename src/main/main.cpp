@@ -340,6 +340,11 @@ void main_procedure(model& m, const boost::optional<model>& ref, // m is non-con
 	vec corner2(gd[0].end,   gd[1].end,   gd[2].end);
 	
 	if(verbosity > 1 && !score_only) {
+		fl size_x = corner2[0] - corner1[0];
+		fl size_y = corner2[1] - corner1[1];
+		fl size_z = corner2[2] - corner1[2];
+		fl volume = size_x * size_y * size_z;
+		
 		log << "Search space:";
 		log.endl();
 		log << "  Center: (" << std::fixed << std::setprecision(3) 
@@ -348,13 +353,12 @@ void main_procedure(model& m, const boost::optional<model>& ref, // m is non-con
 		    << (corner1[2] + corner2[2])/2 << ")";
 		log.endl();
 		log << "  Size: (" << std::fixed << std::setprecision(3) 
-		    << (corner2[0] - corner1[0]) << " x " 
-		    << (corner2[1] - corner1[1]) << " x " 
-		    << (corner2[2] - corner1[2]) << ") Angstrom";
+		    << size_x << " x " 
+		    << size_y << " x " 
+		    << size_z << ") Angstrom";
 		log.endl();
 		log << "  Volume: " << std::fixed << std::setprecision(1) 
-		    << (corner2[0] - corner1[0]) * (corner2[1] - corner1[1]) * (corner2[2] - corner1[2]) 
-		    << " Angstrom^3";
+		    << volume << " Angstrom^3";
 		log.endl();
 	}
 

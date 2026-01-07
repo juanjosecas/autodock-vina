@@ -35,7 +35,7 @@ Cuando la verbosidad es > 1 (default = 2), el programa ahora muestra detalles so
 ```
 Search space:
   Center: (15.000, 20.000, 25.000)
-  Size: (30.000 x 30.000 x 30.000) Angstrom^3
+  Size: (30.000 x 30.000 x 30.000) Angstrom
   Volume: 27000.0 Angstrom^3
 ```
 
