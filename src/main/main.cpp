@@ -30,6 +30,7 @@
 #include <boost/filesystem/exception.hpp>
 #include <boost/filesystem/convenience.hpp> // filesystem::basename
 #include <boost/thread/thread.hpp> // hardware_concurrency // FIXME rm ?
+#include <boost/timer.hpp>
 #include "parse_pdbqt.h"
 #include "parallel_mc.h"
 #include "file.h"
@@ -63,6 +64,13 @@ void done(int verbosity, tee& log) {
 		log.endl();
 	}
 }
+
+void done_with_time(int verbosity, tee& log, double elapsed_time) {
+	if(verbosity > 1) {
+		log << "done (elapsed time: " << std::fixed << std::setprecision(3) << elapsed_time << "s).";
+		log.endl();
+	}
+}
 std::string default_output(const std::string& input_name) {
 	std::string tmp = input_name;
 	if(tmp.size() >= 6 && tmp.substr(tmp.size()-6, 6) == ".pdbqt")
@@ -91,6 +99,8 @@ void do_randomization(model& m,
 	if(verbosity > 1) {
 		log << "Using random seed: " << seed;
 		log.endl();
+		log << "Attempting to find low-clash initial conformation...";
+		log.endl();
 	}
 	const sz attempts = 10000;
 	conf best_conf = init_conf;
@@ -103,11 +113,15 @@ void do_randomization(model& m,
 		if(i == 0 || penalty < best_clash_penalty) {
 			best_conf = c;
 			best_clash_penalty = penalty;
+			if(verbosity > 2) {
+				log << "  Attempt " << (i+1) << "/" << attempts << ": clash penalty = " << penalty;
+				log.endl();
+			}
 		}
 	}
 	m.set(best_conf);
 	if(verbosity > 1) {
-		log << "Clash penalty: " << best_clash_penalty; // FIXME rm?
+		log << "Best clash penalty found: " << best_clash_penalty;
 		log.endl();
 	}
 	m.write_structure(make_path(out_name));
@@ -210,10 +224,33 @@ void do_search(model& m, const boost::optional<model>& ref, const scoring_functi
 		log << "Using random seed: " << seed;
 		log.endl();
 		output_container out_cont;
+		
+		if(verbosity > 1) {
+			log << "Search parameters:";
+			log.endl();
+			log << "  Number of runs: " << par.num_tasks;
+			log.endl();
+			log << "  Steps per run: " << par.mc.num_steps;
+			log.endl();
+			log << "  Number of threads: " << par.num_threads;
+			log.endl();
+		}
+		
+		boost::timer search_timer;
 		doing(verbosity, "Performing search", log);
 		par(m, out_cont, prec, ig, prec_widened, ig_widened, corner1, corner2, generator);
-		done(verbosity, log);
+		done_with_time(verbosity, log, search_timer.elapsed());
+		
+		if(verbosity > 1) {
+			log << "Search produced " << out_cont.size() << " initial results";
+			log.endl();
+			if(!out_cont.empty()) {
+				log << "Best energy found: " << std::fixed << std::setprecision(3) << out_cont.front().e << " (kcal/mol)";
+				log.endl();
+			}
+		}
 
+		boost::timer refine_timer;
 		doing(verbosity, "Refining results", log);
 		VINA_FOR_IN(i, out_cont)
 			refine_structure(m, prec, nc, out_cont[i], authentic_v, par.mc.ssd_par.evals);
@@ -231,7 +268,12 @@ void do_search(model& m, const boost::optional<model>& ref, const scoring_functi
 		const fl out_min_rmsd = 1;
 		out_cont = remove_redundant(out_cont, out_min_rmsd);
 
-		done(verbosity, log);
+		done_with_time(verbosity, log, refine_timer.elapsed());
+		
+		if(verbosity > 1 && !out_cont.empty()) {
+			log << "After refinement, " << out_cont.size() << " unique conformations";
+			log.endl();
+		}
 
 		log.setf(std::ios::fixed, std::ios::floatfield);
 		log.setf(std::ios::showpoint);
@@ -280,6 +322,7 @@ void main_procedure(model& m, const boost::optional<model>& ref, // m is non-con
 				 const flv& weights,
 				 int cpu, int seed, int verbosity, sz num_modes, fl energy_range, tee& log) {
 
+	boost::timer timer;
 	doing(verbosity, "Setting up the scoring function", log);
 
 	everything t;
@@ -291,10 +334,29 @@ void main_procedure(model& m, const boost::optional<model>& ref, // m is non-con
 	const fl right = 0.25;
 	precalculate prec_widened(prec); prec_widened.widen(left, right);
 
-	done(verbosity, log);
+	done_with_time(verbosity, log, timer.elapsed());
 
 	vec corner1(gd[0].begin, gd[1].begin, gd[2].begin);
 	vec corner2(gd[0].end,   gd[1].end,   gd[2].end);
+	
+	if(verbosity > 1 && !score_only) {
+		log << "Search space:";
+		log.endl();
+		log << "  Center: (" << std::fixed << std::setprecision(3) 
+		    << (corner1[0] + corner2[0])/2 << ", " 
+		    << (corner1[1] + corner2[1])/2 << ", " 
+		    << (corner1[2] + corner2[2])/2 << ")";
+		log.endl();
+		log << "  Size: (" << std::fixed << std::setprecision(3) 
+		    << (corner2[0] - corner1[0]) << " x " 
+		    << (corner2[1] - corner1[1]) << " x " 
+		    << (corner2[2] - corner1[2]) << ") Angstrom^3";
+		log.endl();
+		log << "  Volume: " << std::fixed << std::setprecision(1) 
+		    << (corner2[0] - corner1[0]) * (corner2[1] - corner1[1]) * (corner2[2] - corner1[2]) 
+		    << " Angstrom^3";
+		log.endl();
+	}
 
 	parallel_mc par;
 	sz heuristic = m.num_movable_atoms() + 10 * m.get_size().num_degrees_of_freedom();
@@ -306,6 +368,17 @@ void main_procedure(model& m, const boost::optional<model>& ref, // m is non-con
 	par.num_tasks = exhaustiveness;
 	par.num_threads = cpu;
 	par.display_progress = (verbosity > 1);
+	
+	if(verbosity > 1 && !score_only) {
+		log << "Ligand information:";
+		log.endl();
+		log << "  Movable atoms: " << m.num_movable_atoms();
+		log.endl();
+		log << "  Degrees of freedom: " << m.get_size().num_degrees_of_freedom();
+		log.endl();
+		log << "  Computed heuristic: " << heuristic;
+		log.endl();
+	}
 
 	const fl slope = 1e6; // FIXME: too large? used to be 100
 	if(randomize_only) {
@@ -324,10 +397,11 @@ void main_procedure(model& m, const boost::optional<model>& ref, // m is non-con
 		}
 		else {
 			bool cache_needed = !(score_only || randomize_only || local_only);
+			boost::timer cache_timer;
 			if(cache_needed) doing(verbosity, "Analyzing the binding site", log);
 			cache c("scoring_function_version001", gd, slope, atom_type::XS);
 			if(cache_needed) c.populate(m, prec, m.get_movable_atom_types(prec.atom_typing_used()));
-			if(cache_needed) done(verbosity, log);
+			if(cache_needed) done_with_time(verbosity, log, cache_timer.elapsed());
 			do_search(m, ref, wt, prec, c, prec, c, nc,
 					  out_name,
 					  corner1, corner2,
@@ -652,6 +726,21 @@ Thank you!\n";
 			
 		boost::optional<model> ref;
 		done(verbosity, log);
+		
+		if(verbosity > 1) {
+			log << "Input information:";
+			log.endl();
+			if(rigid_name_opt) {
+				log << "  Receptor: " << rigid_name;
+				log.endl();
+			}
+			if(flex_name_opt) {
+				log << "  Flexible residues: " << flex_name;
+				log.endl();
+			}
+			log << "  Ligand: " << ligand_name;
+			log.endl();
+		}
 
 		main_procedure(m, ref, 
 					out_name,
