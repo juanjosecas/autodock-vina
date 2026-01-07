@@ -225,7 +225,7 @@ Flags adicionales:
 ### Baja Prioridad (Impacto Esperado: 5-10%)
 1. **Optimización de parsing**
 2. **Memory allocator tuning**
-3. **Mejoras en estructuras de datos menores
+3. **Mejoras en estructuras de datos menores**
 
 ## 6. Mediciones y Validación
 
