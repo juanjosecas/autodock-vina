@@ -114,8 +114,8 @@ void do_randomization(model& m,
 		if(i == 0 || penalty < best_clash_penalty) {
 			best_conf = c;
 			best_clash_penalty = penalty;
-			if(verbosity > 2) {
-				log << "  Attempt " << (i+1) << "/" << attempts << ": clash penalty = " << penalty;
+			if(verbosity > 2 && (i < 10 || (i+1) % 1000 == 0)) {
+				log << "  Attempt " << (i+1) << "/" << attempts << ": new best clash penalty = " << penalty;
 				log.endl();
 			}
 		}
