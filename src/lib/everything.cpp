@@ -279,25 +279,32 @@ struct desolvation_improved : public usable {
 		// Stronger penalty for burying polar atoms, less for hydrophobic
 		fl desolvation_factor = 0.0;
 		
+		// Desolvation factors based on literature entropy/enthalpy values
+		const fl POLAR_POLAR_PENALTY = 1.0;      // Strong penalty for burying two polar atoms
+		const fl HYDROPHOBIC_BONUS = -0.3;       // Favorable burial of hydrophobic atoms (hydrophobic effect)
+		const fl MIXED_PENALTY = 0.3;            // Moderate penalty for mixed polarity
+		const fl GAUSSIAN_WIDTH = 1.5;           // Width parameter for distance dependence (Å)
+		const fl DISTANCE_CUTOFF_OFFSET = 2.0;   // Distance beyond optimal where effect diminishes (Å)
+		
 		// Calculate desolvation penalty based on polarity
 		bool t1_hydrophobic = xs_is_hydrophobic(t1);
 		bool t2_hydrophobic = xs_is_hydrophobic(t2);
 		
 		if(!t1_hydrophobic && !t2_hydrophobic) {
 			// Both polar: strong desolvation penalty
-			desolvation_factor = 1.0;
+			desolvation_factor = POLAR_POLAR_PENALTY;
 		} else if(t1_hydrophobic && t2_hydrophobic) {
-			// Both hydrophobic: minimal penalty (favorable burial)
-			desolvation_factor = -0.3;
+			// Both hydrophobic: favorable burial (hydrophobic effect)
+			desolvation_factor = HYDROPHOBIC_BONUS;
 		} else {
 			// Mixed: moderate penalty
-			desolvation_factor = 0.3;
+			desolvation_factor = MIXED_PENALTY;
 		}
 		
 		// Distance-dependent: closer contacts have stronger effects
 		fl d_optimal = optimal_distance(t1, t2);
-		if(r < d_optimal + 2.0) {
-			return weight * desolvation_factor * gaussian(r - d_optimal, 1.5);
+		if(r < d_optimal + DISTANCE_CUTOFF_OFFSET) {
+			return weight * desolvation_factor * gaussian(r - d_optimal, GAUSSIAN_WIDTH);
 		}
 		return 0;
 	}

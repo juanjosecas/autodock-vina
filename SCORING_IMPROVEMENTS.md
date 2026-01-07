@@ -93,9 +93,11 @@ While this scoring function has proven effective, modern research has identified
 
 **Implementation:**
 - Differentiates polar-polar, hydrophobic-hydrophobic, and mixed contacts
-- Strong penalty for polar-polar burial (unfavorable desolvation)
-- Favorable contribution for hydrophobic burial
-- Gaussian distance dependence (strongest at close contacts)
+- Strong penalty (1.0) for polar-polar burial (unfavorable desolvation)
+- Favorable contribution (-0.3) for hydrophobic burial (hydrophobic effect)
+- Moderate penalty (0.3) for mixed polarity contacts
+- Gaussian distance dependence with width=1.5Å (strongest at close contacts)
+- Cutoff at optimal_distance + 2.0Å
 - Currently disabled (d=0) pending parameter optimization
 
 **Impact:** Better accuracy for ligands with mixed hydrophobic/polar character

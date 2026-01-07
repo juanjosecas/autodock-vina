@@ -283,7 +283,9 @@ inline bool xs_is_halogen(sz xs) {
 }
 
 inline bool xs_is_aromatic(sz xs) {
-	return xs == XS_TYPE_C_P; // Planar carbon (aromatic)
+	// XS_TYPE_C_P represents planar carbon which includes aromatic carbons
+	// Used as proxy for aromatic systems in pi-stacking calculations
+	return xs == XS_TYPE_C_P; // Planar carbon (includes aromatic)
 }
 
 inline const atom_kind& ad_type_property(sz i) {
