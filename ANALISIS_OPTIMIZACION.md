@@ -167,11 +167,11 @@ Flags adicionales:
 
 ## 3. Optimizaciones de Memoria
 
-### 3.1 Alocación de Memoria
+### 3.1 Asignación de Memoria
 
 **Problemas**:
 - Uso extensivo de `std::vector` con redimensionamientos
-- Allocations frecuentes en bucles internos
+- Asignaciones frecuentes en bucles internos
 
 **Soluciones**:
 1. **Reserve**: Usar `.reserve()` antes de bucles que llenan vectores
