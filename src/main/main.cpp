@@ -350,7 +350,7 @@ void main_procedure(model& m, const boost::optional<model>& ref, // m is non-con
 		log << "  Size: (" << std::fixed << std::setprecision(3) 
 		    << (corner2[0] - corner1[0]) << " x " 
 		    << (corner2[1] - corner1[1]) << " x " 
-		    << (corner2[2] - corner1[2]) << ") Angstrom^3";
+		    << (corner2[2] - corner1[2]) << ") Angstrom";
 		log.endl();
 		log << "  Volume: " << std::fixed << std::setprecision(1) 
 		    << (corner2[0] - corner1[0]) * (corner2[1] - corner1[1]) * (corner2[2] - corner1[2]) 
