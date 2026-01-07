@@ -1,0 +1,4 @@
+*.log
+*.o
+vina
+vina_split
