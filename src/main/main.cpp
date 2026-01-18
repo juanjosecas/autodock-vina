@@ -320,6 +320,60 @@ void do_search(model& m, const boost::optional<model>& ref, const scoring_functi
 		write_all_output(m, out_cont, how_many, out_name, remarks);
 		done(verbosity, log);
 
+		// Enhanced output for high verbosity (verbosity > 2)
+		if(verbosity > 2 && how_many > 0) {
+			log << "\n";
+			log << "Detailed energy breakdown for each mode:\n";
+			log << "=========================================\n";
+			VINA_FOR(i, how_many) {
+				log << "\nMode " << (i+1) << ":\n";
+				log << "  Total affinity: " << std::fixed << std::setprecision(3) << out_cont[i].e << " (kcal/mol)\n";
+				
+				// Set model to this conformation and get term values
+				m.set(out_cont[i].c);
+				flv term_values = t.evale_robust(m);
+				if(term_values.size() >= 5) {
+					log << "  Energy contributions (before weighting):\n";
+					log << "    Gauss 1      : " << std::setprecision(5) << term_values[0] << "\n";
+					log << "    Gauss 2      : " << std::setprecision(5) << term_values[1] << "\n";
+					log << "    Repulsion    : " << std::setprecision(5) << term_values[2] << "\n";
+					log << "    Hydrophobic  : " << std::setprecision(5) << term_values[3] << "\n";
+					log << "    Hydrogen     : " << std::setprecision(5) << term_values[4] << "\n";
+				}
+				
+				// Calculate intramolecular energy
+				fl intramol_energy = m.eval_intramolecular(prec, authentic_v, out_cont[i].c);
+				log << "  Intramolecular energy: " << std::setprecision(3) << intramol_energy << " (kcal/mol)\n";
+				
+				// Geometry information
+				vecv coords = m.get_heavy_atom_movable_coords();
+				if(!coords.empty()) {
+					// Calculate center of mass for ligand
+					vec center_of_mass(0, 0, 0);
+					VINA_FOR_IN(j, coords) {
+						center_of_mass += coords[j];
+					}
+					if(coords.size() > 0) {
+						fl inv_num_coords = 1.0 / static_cast<fl>(coords.size());
+						center_of_mass *= inv_num_coords;
+						log << "  Ligand center of mass: (" 
+						    << std::setprecision(3) << center_of_mass[0] << ", "
+						    << center_of_mass[1] << ", "
+						    << center_of_mass[2] << ")\n";
+					}
+					
+					// Calculate approximate ligand size (max distance from center)
+					fl max_dist = 0;
+					VINA_FOR_IN(j, coords) {
+						fl dist = (coords[j] - center_of_mass).norm();
+						if(dist > max_dist) max_dist = dist;
+					}
+					log << "  Ligand max radius: " << std::setprecision(3) << max_dist << " Angstrom\n";
+				}
+			}
+			log << "\n";
+		}
+
 		if(how_many < 1) {
 			log << "WARNING: Could not find any conformations completely within the search space.\n"
 				<< "WARNING: Check that it is large enough for all movable atoms, including those in the flexible side chains.";
@@ -579,6 +633,7 @@ Thank you!\n";
 			("exhaustiveness", value<int>(&exhaustiveness)->default_value(8), "exhaustiveness of the global search (roughly proportional to time): 1+")
 			("num_modes", value<int>(&num_modes)->default_value(9), "maximum number of binding modes to generate")
 			("energy_range", value<fl>(&energy_range)->default_value(3.0), "maximum energy difference between the best binding mode and the worst one displayed (kcal/mol)")
+			("verbosity", value<int>(&verbosity)->default_value(2), "verbosity (0=no output, 1=normal, 2=verbose, 3=extra verbose with energy details)")
 		;
 		options_description config("Configuration file (optional)");
 		config.add_options()
