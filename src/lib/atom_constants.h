@@ -276,6 +276,18 @@ inline bool xs_h_bond_possible(sz t1, sz t2) {
 	return xs_donor_acceptor(t1, t2) || xs_donor_acceptor(t2, t1);
 }
 
+inline bool xs_is_halogen(sz xs) {
+	return xs == XS_TYPE_Cl_H ||
+	       xs == XS_TYPE_Br_H ||
+	       xs == XS_TYPE_I_H;
+}
+
+inline bool xs_is_aromatic(sz xs) {
+	// XS_TYPE_C_P represents planar carbon which includes aromatic carbons
+	// Used as proxy for aromatic systems in pi-stacking calculations
+	return xs == XS_TYPE_C_P; // Planar carbon (includes aromatic)
+}
+
 inline const atom_kind& ad_type_property(sz i) {
 	assert(AD_TYPE_SIZE == atom_kinds_size);
     assert(i < atom_kinds_size);
