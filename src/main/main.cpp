@@ -71,7 +71,8 @@ void log_to_file(std::ofstream* detail_log, const std::string& category, const s
 		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
 			now.time_since_epoch()) % 1000;
 		
-		char time_str[100];
+		constexpr size_t TIME_BUFFER_SIZE = 100;
+		char time_str[TIME_BUFFER_SIZE];
 		std::strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", std::localtime(&time_t_now));
 		
 		*detail_log << "[" << time_str << "." << std::setfill('0') << std::setw(3) << ms.count() 
@@ -397,14 +398,12 @@ void do_search(model& m, const boost::optional<model>& ref, const scoring_functi
 					VINA_FOR_IN(j, coords) {
 						center_of_mass += coords[j];
 					}
-					if(coords.size() > 0) {
-						fl inv_num_coords = 1.0 / static_cast<fl>(coords.size());
-						center_of_mass *= inv_num_coords;
-						log << "  Ligand center of mass: (" 
-						    << std::setprecision(3) << center_of_mass[0] << ", "
-						    << center_of_mass[1] << ", "
-						    << center_of_mass[2] << ")\n";
-					}
+					fl inv_num_coords = 1.0 / static_cast<fl>(coords.size());
+					center_of_mass *= inv_num_coords;
+					log << "  Ligand center of mass: (" 
+					    << std::setprecision(3) << center_of_mass[0] << ", "
+					    << center_of_mass[1] << ", "
+					    << center_of_mass[2] << ")\n";
 					
 					// Calculate approximate ligand size (max distance from center)
 					fl max_dist = 0;

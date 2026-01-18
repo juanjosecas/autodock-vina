@@ -30,6 +30,9 @@
 
 // Simple progress display (replaces deprecated boost::progress_display)
 class simple_progress_display {
+	static constexpr unsigned long PROGRESS_BAR_WIDTH = 50;
+	static constexpr double PROGRESS_BAR_WIDTH_DOUBLE = 50.0;
+	
 	unsigned long _count;
 	unsigned long _expected_count;
 	unsigned long _next_tic_count;
@@ -66,11 +69,11 @@ public:
 private:
 	void display_tic() {
 		unsigned int tics_needed = static_cast<unsigned int>(
-			(static_cast<double>(_count) / _expected_count) * 50.0);
+			(static_cast<double>(_count) / _expected_count) * PROGRESS_BAR_WIDTH_DOUBLE);
 		while(_tic < tics_needed) {
 			std::cout << '*' << std::flush;
 			_next_tic_count = static_cast<unsigned long>(
-				(static_cast<double>(++_tic) / 50.0) * _expected_count);
+				(static_cast<double>(++_tic) / PROGRESS_BAR_WIDTH_DOUBLE) * _expected_count);
 		}
 	}
 };
