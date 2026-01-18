@@ -344,6 +344,7 @@ void do_search(model& m, const boost::optional<model>& ref, const scoring_functi
 
 		sz how_many = 0;
 		std::vector<std::string> remarks;
+		remarks.reserve(num_modes); // Optimization: pre-allocate for expected number of modes
 		VINA_FOR_IN(i, out_cont) {
 			if(how_many >= num_modes || !not_max(out_cont[i].e) || out_cont[i].e > out_cont[0].e + energy_range) break; // check energy_range sanity FIXME
 			++how_many;
@@ -811,6 +812,7 @@ Thank you!\n";
 		grid_dims gd; // n's = 0 via default c'tor
 
 		flv weights;
+		weights.reserve(6); // Optimization: pre-allocate for 6 weights
 		weights.push_back(weight_gauss1);
 		weights.push_back(weight_gauss2);
 		weights.push_back(weight_repulsion);
