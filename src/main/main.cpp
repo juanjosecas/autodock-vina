@@ -26,6 +26,8 @@
 #include <vector> // ligand paths
 #include <cmath> // for ceila
 #include <iomanip> // for setprecision, fixed
+#include <fstream> // for ofstream (logging)
+#include <ctime> // for time formatting in logs
 #include <chrono> // for timing (modern C++14)
 #include <boost/program_options.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -59,6 +61,23 @@ public:
 		return diff.count();
 	}
 };
+
+// Simple structured logging helper (writes to file if provided)
+void log_to_file(std::ofstream* detail_log, const std::string& category, const std::string& message) {
+	if(detail_log && detail_log->is_open()) {
+		// Get current time
+		auto now = std::chrono::system_clock::now();
+		auto time_t_now = std::chrono::system_clock::to_time_t(now);
+		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+			now.time_since_epoch()) % 1000;
+		
+		char time_str[100];
+		std::strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", std::localtime(&time_t_now));
+		
+		*detail_log << "[" << time_str << "." << std::setfill('0') << std::setw(3) << ms.count() 
+		            << "] [" << category << "] " << message << std::endl;
+	}
+}
 
 path make_path(const std::string& str) {
 	return path(str);
@@ -181,7 +200,7 @@ void do_search(model& m, const boost::optional<model>& ref, const scoring_functi
 			   const std::string& out_name,
 			   const vec& corner1, const vec& corner2,
 			   const parallel_mc& par, fl energy_range, sz num_modes,
-			   int seed, int verbosity, bool score_only, bool local_only, tee& log, const terms& t, const flv& weights) {
+			   int seed, int verbosity, bool score_only, bool local_only, tee& log, const terms& t, const flv& weights, std::ofstream* detail_log = NULL) {
 	conf_size s = m.get_size();
 	conf c = m.get_initial_conf();
 	fl e = max_fl;
@@ -236,6 +255,12 @@ void do_search(model& m, const boost::optional<model>& ref, const scoring_functi
 		rng generator(static_cast<rng::result_type>(seed));
 		log << "Using random seed: " << seed;
 		log.endl();
+		
+		// Log docking start
+		std::ostringstream seed_msg;
+		seed_msg << "Starting docking with random seed: " << seed;
+		log_to_file(detail_log, "DOCKING", seed_msg.str());
+		
 		output_container out_cont;
 		
 		if(verbosity > 1) {
@@ -247,6 +272,15 @@ void do_search(model& m, const boost::optional<model>& ref, const scoring_functi
 			log.endl();
 			log << "  Number of threads: " << par.num_threads;
 			log.endl();
+		}
+		
+		// Log search parameters
+		if(detail_log) {
+			std::ostringstream params;
+			params << "Search parameters - runs: " << par.num_tasks 
+			       << ", steps: " << par.mc.num_steps 
+			       << ", threads: " << par.num_threads;
+			log_to_file(detail_log, "PARAMS", params.str());
 		}
 		
 		simple_timer search_timer;
@@ -282,6 +316,15 @@ void do_search(model& m, const boost::optional<model>& ref, const scoring_functi
 		out_cont = remove_redundant(out_cont, out_min_rmsd);
 
 		done_with_time(verbosity, log, refine_timer.elapsed());
+		
+		// Log refinement results
+		if(detail_log && !out_cont.empty()) {
+			std::ostringstream refine_msg;
+			refine_msg << "Refinement completed. Found " << out_cont.size() 
+			           << " unique conformations. Best energy: " 
+			           << std::fixed << std::setprecision(3) << out_cont[0].e << " kcal/mol";
+			log_to_file(detail_log, "REFINE", refine_msg.str());
+		}
 		
 		if(verbosity > 1 && !out_cont.empty()) {
 			log << "After refinement, " << out_cont.size() << " unique conformations";
@@ -387,7 +430,7 @@ void main_procedure(model& m, const boost::optional<model>& ref, // m is non-con
 				 bool score_only, bool local_only, bool randomize_only, bool no_cache,
 				 const grid_dims& gd, int exhaustiveness,
 				 const flv& weights,
-				 int cpu, int seed, int verbosity, sz num_modes, fl energy_range, tee& log) {
+				 int cpu, int seed, int verbosity, sz num_modes, fl energy_range, tee& log, std::ofstream* detail_log = NULL) {
 
 	simple_timer timer;
 	doing(verbosity, "Setting up the scoring function", log);
@@ -464,7 +507,7 @@ void main_procedure(model& m, const boost::optional<model>& ref, // m is non-con
 					  out_name,
 					  corner1, corner2,
 					  par, energy_range, num_modes,
-					  seed, verbosity, score_only, local_only, log, t, weights);
+					  seed, verbosity, score_only, local_only, log, t, weights, detail_log);
 		}
 		else {
 			bool cache_needed = !(score_only || randomize_only || local_only);
@@ -477,7 +520,7 @@ void main_procedure(model& m, const boost::optional<model>& ref, // m is non-con
 					  out_name,
 					  corner1, corner2,
 					  par, energy_range, num_modes,
-					  seed, verbosity, score_only, local_only, log, t, weights);
+					  seed, verbosity, score_only, local_only, log, t, weights, detail_log);
 		}
 	}
 }
@@ -576,7 +619,7 @@ Thank you!\n";
 #################################################################\n";
 
 	try {
-		std::string rigid_name, ligand_name, flex_name, config_name, out_name, log_name;
+		std::string rigid_name, ligand_name, flex_name, config_name, out_name, log_name, detail_log_name;
 		fl center_x, center_y, center_z, size_x, size_y, size_z;
 		int cpu = 0, seed, exhaustiveness, verbosity = 2, num_modes = 9;
 		fl energy_range = 2.0;
@@ -613,6 +656,7 @@ Thank you!\n";
 		outputs.add_options()
 			("out", value<std::string>(&out_name), "output models (PDBQT), the default is chosen based on the ligand file name")
 			("log", value<std::string>(&log_name), "optionally, write log file")
+			("detail_log", value<std::string>(&detail_log_name), "optionally, write detailed structured log file with timestamps")
 		;
 		options_description advanced("Advanced options (see the manual)");
 		advanced.add_options()
@@ -728,8 +772,19 @@ Thank you!\n";
 		tee log;
 		if(vm.count("log") > 0)
 			log.init(log_name);
+		
+		// Open detailed log file if requested
+		std::ofstream detail_log_file;
+		std::ofstream* detail_log_ptr = NULL;
+		if(vm.count("detail_log") > 0) {
+			detail_log_file.open(detail_log_name.c_str());
+			if(detail_log_file.is_open()) {
+				detail_log_ptr = &detail_log_file;
+				log_to_file(detail_log_ptr, "START", "AutoDock Vina detailed log started");
+			}
+		}
 
-		if(search_box_needed) { 
+		if(search_box_needed) {
 			options_occurrence oo = get_occurrence(vm, search_area);
 			if(!oo.all) {
 				check_occurrence(vm, search_area);
@@ -819,7 +874,13 @@ Thank you!\n";
 					score_only, local_only, randomize_only, false, // no_cache == false
 					gd, exhaustiveness,
 					weights,
-					cpu, seed, verbosity, max_modes_sz, energy_range, log);
+					cpu, seed, verbosity, max_modes_sz, energy_range, log, detail_log_ptr);
+		
+		// Close detailed log if open
+		if(detail_log_file.is_open()) {
+			log_to_file(detail_log_ptr, "END", "AutoDock Vina detailed log ended");
+			detail_log_file.close();
+		}
 	}
 	catch(file_error& e) {
 		std::cerr << "\n\nError: could not open \"" << e.name.filename() << "\" for " << (e.in ? "reading" : "writing") << ".\n";
