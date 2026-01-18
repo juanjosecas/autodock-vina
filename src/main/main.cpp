@@ -26,12 +26,12 @@
 #include <vector> // ligand paths
 #include <cmath> // for ceila
 #include <iomanip> // for setprecision, fixed
+#include <chrono> // for timing (modern C++14)
 #include <boost/program_options.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/exception.hpp>
 #include <boost/filesystem/convenience.hpp> // filesystem::basename
 #include <boost/thread/thread.hpp> // hardware_concurrency // FIXME rm ?
-#include <boost/timer.hpp>
 #include "parse_pdbqt.h"
 #include "parallel_mc.h"
 #include "file.h"
@@ -47,6 +47,18 @@
 #include "coords.h" // add_to_output_container
 
 using boost::filesystem::path;
+
+// Simple timer class using std::chrono (modern C++14 replacement for boost::timer)
+class simple_timer {
+	std::chrono::steady_clock::time_point start_time;
+public:
+	simple_timer() : start_time(std::chrono::steady_clock::now()) {}
+	double elapsed() const {
+		auto end_time = std::chrono::steady_clock::now();
+		std::chrono::duration<double> diff = end_time - start_time;
+		return diff.count();
+	}
+};
 
 path make_path(const std::string& str) {
 	return path(str);
@@ -237,7 +249,7 @@ void do_search(model& m, const boost::optional<model>& ref, const scoring_functi
 			log.endl();
 		}
 		
-		boost::timer search_timer;
+		simple_timer search_timer;
 		doing(verbosity, "Performing search", log);
 		par(m, out_cont, prec, ig, prec_widened, ig_widened, corner1, corner2, generator);
 		done_with_time(verbosity, log, search_timer.elapsed());
@@ -251,7 +263,7 @@ void do_search(model& m, const boost::optional<model>& ref, const scoring_functi
 			}
 		}
 
-		boost::timer refine_timer;
+		simple_timer refine_timer;
 		doing(verbosity, "Refining results", log);
 		VINA_FOR_IN(i, out_cont)
 			refine_structure(m, prec, nc, out_cont[i], authentic_v, par.mc.ssd_par.evals);
@@ -323,7 +335,7 @@ void main_procedure(model& m, const boost::optional<model>& ref, // m is non-con
 				 const flv& weights,
 				 int cpu, int seed, int verbosity, sz num_modes, fl energy_range, tee& log) {
 
-	boost::timer timer;
+	simple_timer timer;
 	doing(verbosity, "Setting up the scoring function", log);
 
 	everything t;
@@ -402,7 +414,7 @@ void main_procedure(model& m, const boost::optional<model>& ref, // m is non-con
 		}
 		else {
 			bool cache_needed = !(score_only || randomize_only || local_only);
-			boost::timer cache_timer;
+			simple_timer cache_timer;
 			if(cache_needed) doing(verbosity, "Analyzing the binding site", log);
 			cache c("scoring_function_version001", gd, slope, atom_type::XS);
 			if(cache_needed) c.populate(m, prec, m.get_movable_atom_types(prec.atom_typing_used()));

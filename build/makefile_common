@@ -4,9 +4,10 @@ SPLITOBJ = split.o
 
 INCFLAGS = -I $(BOOST_INCLUDE)
 
+# Updated to C++14 for modern boost compatibility and safer modernizations
 # -pedantic fails on Mac with Boost 1.41 (syntax problems in their headers)
 #CC = ${GPP} ${C_PLATFORM} -ansi -pedantic -Wno-long-long ${C_OPTIONS} $(INCFLAGS)
-CC = ${GPP} ${C_PLATFORM} -ansi -Wno-long-long ${C_OPTIONS} $(INCFLAGS)
+CC = ${GPP} ${C_PLATFORM} -std=c++14 -Wno-long-long ${C_OPTIONS} $(INCFLAGS)
 
 LDFLAGS = -L$(BASE)/lib -L.
 
